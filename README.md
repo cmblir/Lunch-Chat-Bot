@@ -1,2 +1,2 @@
-# -Lunch-Chat-Bot
+# Lunch-Chat-Bot
 LCB
