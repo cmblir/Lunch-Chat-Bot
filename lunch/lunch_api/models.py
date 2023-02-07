@@ -1,6 +1,5 @@
 from django.db import models
 
-'''
 # Create your models here.
 class Species(models.Model):
     name = models.CharField(max_length=100)
@@ -17,4 +16,3 @@ class Person(models.Model):
    birth_year = models.CharField(max_length=10)
    eye_color = models.CharField(max_length=10)
    species = models.ForeignKey(Species, on_delete=models.DO_NOTHING)
-'''
