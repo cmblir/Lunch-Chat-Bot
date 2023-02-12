@@ -1,13 +1,13 @@
-import os
 import time
-import re
 import chromedriver_autoinstaller
 import pandas as pd
+import warnings
 from time import sleep
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import ElementNotInteractableException
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from tqdm import tqdm
@@ -25,12 +25,19 @@ class KakaoMapCollection:
         self._DataFrameColumns = ["맛집명", "주소", "영업시간", "전화번호", "총합평점", "업종", "유저이름", "평점", "리뷰"]
         self._DefaultDataFrame = pd.DataFrame(columns = self._DataFrameColumns)
 
-    def DriverSettings(self, linux_mode = False) -> None:
+    def TurnOffWarning(self):
+        """
+        라이브러리의 에러 출력을 지워주는 함수입니다.
+        """
+        warnings.simplefilter("ignore", "FutureWarning")
+
+    def DriverSettings(self, Turn_off_warning = False, linux_mode = False) -> None:
         """
         드라이버 세팅을 하는 함수입니다.
         linux mode를 True로 지정할 경우 백그라운드에서 수집이 가능합니다.
         단, 클릭과 같은 액션은 취하지 못합니다.
         """
+        if Turn_off_warning == True: self.TurnOffWarning()
         chrome_ver = chromedriver_autoinstaller.get_chrome_version().split('.')[0]  #크롬드라이버 버전 확인
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--incognito") # 시크릿 모드
@@ -40,13 +47,13 @@ class KakaoMapCollection:
         chrome_options.add_argument("--disable-dev-shm-usage") # 메모리 부족 에러 방지
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
         try: # 크롬 드라이버
-            self.driver = webdriver.Chrome(f'./{chrome_ver}/chromedriver', chrome_options=chrome_options)   
+            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)   
         except:
             chromedriver_autoinstaller.install(True)
-            self.driver = webdriver.Chrome(f'./{chrome_ver}/chromedriver', chrome_options=chrome_options)
+            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         # WebDruverException Error 방지 기존의 드라이버 버젼으로 지정
         # driver = webdriver.Chrome(executable_path='/Users/cmblir/Python/Musinsa-Analysis/100/chromedriver')
-
+        
     def ClickMoreReview(self):
         """
         리뷰가 있을 경우 계속해서 클릭하여 전체 리뷰를 로드합니다.
@@ -152,7 +159,6 @@ class KakaoMapCollection:
             self.has_next = "disabled" not in next_btn.get_attribute("class").split(" ")
             if not self.has_next:
                 print('Arrow is Disabled')
-                self.driver.close()
                 break # 다음 페이지 없으니까 종료
             else: # 다음 페이지 있으면
                 self.page += 1
@@ -180,8 +186,8 @@ class KakaoMapCollection:
             next_btn = self.driver.find_element(By.ID, "info.search.page.next")
             self.has_next = "disabled" not in next_btn.get_attribute("class").split(" ")
             self.page = 1
-            
             self.Loop()
+            self._DefaultDataFrame.to_excel(f"{gu_name}_finished.xlsx", index=False)
             print("End of Crawl")
 
 
@@ -190,5 +196,5 @@ if __name__ == "__main__":
                '동대문구','성북구','강북구','도봉구','노원구','중랑구','강동구','송파구',
                '강남구','서초구','관악구','동작구','영등포구','금천구','구로구','양천구','강서구']
     Start = KakaoMapCollection(gu_list)
-    Start.DriverSettings()
+    Start.DriverSettings(Turn_off_warning=True)
     Start.StartCrawling()
