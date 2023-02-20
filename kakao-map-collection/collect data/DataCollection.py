@@ -13,23 +13,21 @@ from selenium.webdriver.common.keys import Keys
 from tqdm import tqdm
 
 class KakaoMapCollection:
-    def __init__(self, gu_lst: list) -> list:
+    def __init__(self, gu_name: str) -> str:
         """
         수집을 원하는 구를 리스트형태로 입력해주세요.
         """
         self.default_url = 'https://map.kakao.com/'
-        self.driver = None
-        self.has_next = None
         self.page = 0
-        self.gu_lst = gu_lst
-        self._DataFrameColumns = ["맛집명", "주소", "영업시간", "전화번호", "총합평점", "업종", "유저이름", "평점", "리뷰"]
-        self._DefaultDataFrame = pd.DataFrame(columns = self._DataFrameColumns)
+        self.gu_name = gu_name
+        self.DataFrameColumns = ["맛집명", "주소", "영업시간", "전화번호", "총합평점", "업종", "유저이름", "평점", "리뷰"]
+        self.DefaultDataFrame = pd.DataFrame(columns = self.DataFrameColumns)
 
     def TurnOffWarning(self):
         """
         라이브러리의 에러 출력을 지워주는 함수입니다.
         """
-        warnings.simplefilter("ignore", "FutureWarning")
+        warnings.simplefilter("ignore", FutureWarning)
 
     def DriverSettings(self, Turn_off_warning = False, linux_mode = False) -> None:
         """
@@ -90,7 +88,7 @@ class KakaoMapCollection:
             elif point == "80%;": self.user_rating.append(4)
             elif point == "100%;": self.user_rating.append(5)
 
-    def AppendDataFrame(self):
+    def AppendData(self):
         """
         수집한 정보를 저장하는 함수입니다.
         """
@@ -105,7 +103,7 @@ class KakaoMapCollection:
                           "평점" : user_rating,
                           "리뷰" : user_review}
             AppendDataFrame = pd.DataFrame(AppendDict, index=[0])
-            self._DefaultDataFrame = self._DefaultDataFrame.append(AppendDataFrame, ignore_index = True)
+            self.DefaultDataFrame = self.DefaultDataFrame.append(AppendDataFrame, ignore_index = True)
 
     def GetData(self, place_lists: list) -> list:
         """
@@ -128,9 +126,9 @@ class KakaoMapCollection:
             self.driver.get(detail_link)
             try:
                 self.GetReviewData()
-                self.AppendDataFrame()
+                self.AppendData()
             except:
-                pass
+                print("데이터가 없거나 적재가 불가능합니다.")
             self.driver.back()
 
     def Loop(self):
@@ -149,7 +147,7 @@ class KakaoMapCollection:
                     page.send_keys(Keys.ENTER)
                 except ElementNotInteractableException:
                     print('End of Page')
-                    break;
+                    break
                 sleep(3)
                 place_lists = self.driver.find_elements(By.CSS_SELECTOR, '#info\.search\.place\.list > li')
                 self.GetData(place_lists)
@@ -168,33 +166,35 @@ class KakaoMapCollection:
         """
         수집을 시작하는 함수입니다.
         """
-        for gu_name in tqdm(self.gu_lst):
-            self.driver.implicitly_wait(10) # 10초정도 멈추기
-            self.driver.get(self.default_url)  # 주소 가져오기
-            search_area = self.driver.find_element(By.XPATH, '//*[@id="search.keyword.query"]') # 검색 창
-            search_area.send_keys(gu_name + ' 맛집')  # 검색어 입력
-            self.driver.find_element(By.XPATH, '//*[@id="search.keyword.submit"]').send_keys(Keys.ENTER)  # Enter로 검색
-            self.driver.implicitly_wait(3) # 기다려 주자
-            more_page = self.driver.find_element(By.ID, "info.search.place.more")
-            # more_page.click()
-            more_page.send_keys(Keys.ENTER) # 더보기 누르고
-            # 첫 번째 검색 페이지 끝
-            # driver.implicitly_wait(5) # 기다려 주자
-            time.sleep(1)
+        self.driver.get(self.default_url)  # 주소 가져오기
+        self.driver.implicitly_wait(10) # 10초정도 멈추기
+        search_area = self.driver.find_element(By.XPATH, '//*[@id="search.keyword.query"]') # 검색 창
+        search_area.send_keys(self.gu_name + ' 맛집')  # 검색어 입력
+        self.driver.find_element(By.XPATH, '//*[@id="search.keyword.submit"]').send_keys(Keys.ENTER)  # Enter로 검색
+        self.driver.implicitly_wait(3) # 기다려 주자
+        more_page = self.driver.find_element(By.ID, "info.search.place.more")
+        more_page.send_keys(Keys.ENTER)
+        time.sleep(1)
 
-            # next 사용 가능?
-            next_btn = self.driver.find_element(By.ID, "info.search.page.next")
-            self.has_next = "disabled" not in next_btn.get_attribute("class").split(" ")
-            self.page = 1
-            self.Loop()
-            self._DefaultDataFrame.to_excel(f"{gu_name}_finished.xlsx", index=False)
-            print("End of Crawl")
+        # next 사용 가능?
+        next_btn = self.driver.find_element(By.ID, "info.search.page.next")
+        self.has_next = "disabled" not in next_btn.get_attribute("class").split(" ")
+        self.page = 1
+
+    def ExtractData(self):
+        """
+        데이터를 추출하는 함수입니다.
+        """
+        self.DefaultDataFrame.to_excel(f"{self.gu_name}_finished.xlsx", index=False)
 
 
+"""
 if __name__ == "__main__":
     gu_list = ['마포구','서대문구','은평구','종로구','중구','용산구','성동구','광진구',
                '동대문구','성북구','강북구','도봉구','노원구','중랑구','강동구','송파구',
                '강남구','서초구','관악구','동작구','영등포구','금천구','구로구','양천구','강서구']
-    Start = KakaoMapCollection(gu_list)
-    Start.DriverSettings(Turn_off_warning=True)
-    Start.StartCrawling()
+    for gu_name in gu_list:
+        Start = KakaoMapCollection(gu_name)
+        Start.DriverSettings(Turn_off_warning=True)
+        Start.StartCrawling()
+"""
